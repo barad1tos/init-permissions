@@ -51,8 +51,7 @@ def _merge_stack_tools(allow: list[str], repo_path: Path) -> None:
     """Detect repo stacks and merge their build/test tools into allow[]."""
     stacks = detect_stacks(repo_path)
     for stack in stacks:
-        toolset = STACK_TOOLS.get(stack)
-        if toolset:
+        if toolset := STACK_TOOLS.get(stack):
             for entry in toolset.allow:
                 if entry not in allow:
                     allow.append(entry)

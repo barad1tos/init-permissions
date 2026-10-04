@@ -12,6 +12,12 @@ by detect_profile(). It manages ~/.claude/settings.json itself.
 
 from init_permissions.models import PermissionProfile, StackToolset
 
+# Command groups shared by several profiles
+MAKE = "Bash(make:*)"
+DOCKER_READ = ["Bash(docker ps:*)", "Bash(docker images:*)", "Bash(docker logs:*)"]
+DOCKER_WRITE = ["Bash(docker build:*)", "Bash(docker push:*)"]
+GIT_PUSH = "Bash(git push:*)"
+
 # Stack detection: maps stack identifier to file markers and allowed commands.
 # Used by Work-App profile to add only relevant build tools per detected stack.
 STACK_TOOLS: dict[str, StackToolset] = {
@@ -47,6 +53,9 @@ STACK_TOOLS: dict[str, StackToolset] = {
     ),
 }
 
+# Every stack's build/test tools, for profiles that pre-approve all stacks
+ALL_STACK_ALLOW = [entry for toolset in STACK_TOOLS.values() for entry in toolset.allow]
+
 # Work-Infra profile: terraform/k8s/AWS-heavy repos.
 # Per D-18/D-19: terraform mutate ops go in ask[], not allow[].
 # Per D-19: domain-scoped WebFetch for docs access (curl is globally denied).
@@ -65,13 +74,12 @@ WORK_INFRA = PermissionProfile(
     ],
     ask=[
         # Downgrade globally-allowed git push to require confirmation
-        "Bash(git push:*)",
+        GIT_PUSH,
         # Terraform mutate ops: not in global allow/deny, but require explicit ask
         "Bash(terraform apply:*)",
         "Bash(terraform import:*)",
         # Container/orchestration mutate ops
-        "Bash(docker build:*)",
-        "Bash(docker push:*)",
+        *DOCKER_WRITE,
         "Bash(kubectl apply:*)",
         "Bash(kubectl delete:*)",
         "Bash(kubectl patch:*)",
@@ -87,14 +95,12 @@ WORK_APP = PermissionProfile(
     name="work-app",
     allow=[
         # Base tooling present in all app repos
-        "Bash(make:*)",
-        "Bash(docker ps:*)",
-        "Bash(docker images:*)",
-        "Bash(docker logs:*)",
+        MAKE,
+        *DOCKER_READ,
     ],
     ask=[
         # Downgrade globally-allowed git push to require confirmation
-        "Bash(git push:*)",
+        GIT_PUSH,
         # Publishing operations require explicit confirmation
         "Bash(npm publish:*)",
         "Bash(cargo publish:*)",
@@ -105,36 +111,8 @@ WORK_APP = PermissionProfile(
 # Per D-21/D-22: broad permissions, git push stays auto-approved (no ask[]).
 OWN = PermissionProfile(
     name="own",
-    allow=[
-        # Node stack
-        "Bash(npm:*)",
-        "Bash(npx:*)",
-        "Bash(yarn:*)",
-        "Bash(pnpm:*)",
-        # Python stack
-        "Bash(pytest:*)",
-        # Go stack
-        "Bash(go build:*)",
-        "Bash(go test:*)",
-        "Bash(go run:*)",
-        "Bash(go mod:*)",
-        # Rust stack
-        "Bash(cargo build:*)",
-        "Bash(cargo test:*)",
-        "Bash(cargo run:*)",
-        "Bash(cargo clippy:*)",
-        # JVM stack
-        "Bash(./gradlew:*)",
-        "Bash(gradle:*)",
-        # Build utilities
-        "Bash(make:*)",
-        # Docker read+write (own repos have full trust)
-        "Bash(docker ps:*)",
-        "Bash(docker images:*)",
-        "Bash(docker logs:*)",
-        "Bash(docker build:*)",
-        "Bash(docker push:*)",
-    ],
+    # Every stack, make, and docker read+write (own repos have full trust)
+    allow=[*ALL_STACK_ALLOW, MAKE, *DOCKER_READ, *DOCKER_WRITE],
     ask=[],  # D-22: no restrictions beyond global deny for personal repos
 )
 
@@ -146,27 +124,10 @@ GLOBAL = PermissionProfile(
     name="global",
     allow=[
         # Bash build/test/run tools
-        "Bash(./gradlew:*)",
-        "Bash(cargo build:*)",
-        "Bash(cargo clippy:*)",
-        "Bash(cargo run:*)",
-        "Bash(cargo test:*)",
-        "Bash(docker build:*)",
-        "Bash(docker images:*)",
-        "Bash(docker logs:*)",
-        "Bash(docker ps:*)",
-        "Bash(docker push:*)",
-        "Bash(go build:*)",
-        "Bash(go mod:*)",
-        "Bash(go run:*)",
-        "Bash(go test:*)",
-        "Bash(gradle:*)",
-        "Bash(make:*)",
-        "Bash(npm:*)",
-        "Bash(npx:*)",
-        "Bash(pnpm:*)",
-        "Bash(pytest:*)",
-        "Bash(yarn:*)",
+        *ALL_STACK_ALLOW,
+        MAKE,
+        *DOCKER_READ,
+        *DOCKER_WRITE,
         # Skills
         "Skill(gsd:debug)",
         "Skill(gsd:quick)",

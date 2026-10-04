@@ -194,11 +194,9 @@ def run_global_validate(global_path: Path = _DEFAULT_GLOBAL_PATH) -> ValidationR
         issues.append(f"ask[] drift: expected={sorted(expected_ask)}, actual={sorted(current_ask)}")
         verdict = Verdict.FAIL
 
-    if verdict == Verdict.PASS:
-        extra_allow = current_allow - expected_allow
-        if extra_allow:
-            issues.append(f"allow[] has {len(extra_allow)} extra entries beyond GLOBAL (harmless): {sorted(extra_allow)}")
-            verdict = Verdict.WARN
+    if verdict == Verdict.PASS and (extra_allow := current_allow - expected_allow):
+        issues.append(f"allow[] has {len(extra_allow)} extra entries beyond GLOBAL (harmless): {sorted(extra_allow)}")
+        verdict = Verdict.WARN
 
     return ValidationResult(
         repo_path=path_str,

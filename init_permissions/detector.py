@@ -29,10 +29,7 @@ def detect_profile(repo_path: Path) -> str:
         Profile name: 'work-infra', 'work-app', or 'own'.
     """
     if classify(repo_path) == "work":
-        if _has_terraform_files(repo_path):
-            return "work-infra"
-        return "work-app"
-
+        return "work-infra" if _has_terraform_files(repo_path) else "work-app"
     # Own prefixes and paths outside the configured layout
     return "own"
 
