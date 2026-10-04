@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from init_permissions.detector import detect_profile, detect_stacks
+from init_permissions.layout import settings_relpath
 from init_permissions.models import GeneratedSettings, RepoConfig
 from init_permissions.profiles import STACK_TOOLS, get_profile
 
@@ -139,9 +140,10 @@ def load_repo_config(repo_path: Path) -> RepoConfig | None:
 
 
 def write_settings(settings: GeneratedSettings, repo_path: Path) -> Path:
-    """Write generated settings to .claude/settings.json in the repo.
+    """Write generated settings to the repo's settings file (see layout.settings_relpath).
 
-    Creates the .claude/ directory if it does not exist.
+    Creates the .claude/ directory if it does not exist. Replaces only `$schema` and
+    `permissions`; every other top-level key in an existing file is kept.
     Writes with 2-space indent and a trailing newline.
 
     Args:
@@ -149,15 +151,20 @@ def write_settings(settings: GeneratedSettings, repo_path: Path) -> Path:
         repo_path: Path to the repository root directory.
 
     Returns:
-        Absolute path to the written settings.json file.
+        Absolute path to the written settings file.
     """
-    claude_dir = repo_path / ".claude"
-    claude_dir.mkdir(parents=True, exist_ok=True)
+    output_path = repo_path / settings_relpath(repo_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    output_path = claude_dir / "settings.json"
-    content = json.dumps(settings.to_settings_dict(), indent=2) + "\n"
+    content = json.dumps(merge_settings(output_path, settings), indent=2) + "\n"
     output_path.write_text(content, encoding="utf-8")
     return output_path.resolve()
+
+
+def merge_settings(settings_path: Path, settings: GeneratedSettings) -> dict:
+    """Existing file contents with `$schema` and `permissions` replaced by the generated ones."""
+    current = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
+    return {**current, **settings.to_settings_dict()}
 
 
 def load_global_allow(global_settings_path: Path = _GLOBAL_SETTINGS_PATH) -> set[str]:

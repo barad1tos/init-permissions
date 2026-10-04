@@ -26,6 +26,9 @@ Family = Literal["own", "work"]
 
 CONFIG_ENV_VAR = "INIT_PERMISSIONS_CONFIG"
 
+SHARED_SETTINGS = Path(".claude/settings.json")
+LOCAL_SETTINGS = Path(".claude/settings.local.json")
+
 
 class LayoutProfiles(BaseModel):
     """Path prefixes, relative to git_root, for each profile family."""
@@ -97,6 +100,15 @@ def classify(repo_path: Path) -> Family | None:
 def is_managed(repo_path: Path) -> bool:
     """Whether repo_path falls under a configured own or work prefix."""
     return classify(repo_path) is not None
+
+
+def settings_relpath(repo_path: Path) -> Path:
+    """The settings file this tool owns in repo_path.
+
+    A work repo's settings.json belongs to the team, deny list included, so the profile
+    goes into the gitignored settings.local.json, which Claude Code merges on top of it.
+    """
+    return LOCAL_SETTINGS if classify(repo_path) == "work" else SHARED_SETTINGS
 
 
 def _relative_parts(repo_path: Path, git_root: Path) -> tuple[str, ...] | None:

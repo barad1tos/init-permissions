@@ -37,12 +37,8 @@ from init_permissions.generator import (
     load_global_allow,
     resolve_profile,
 )
-from init_permissions.layout import is_managed
+from init_permissions.layout import is_managed, settings_relpath
 from init_permissions.validator import _discover_managed_repos
-
-_CLAUDE_DIRNAME = ".claude"
-_SETTINGS_FILENAME = "settings.json"
-_SETTINGS_RELPATH = Path(_CLAUDE_DIRNAME) / _SETTINGS_FILENAME
 
 __all__ = [
     "BulkSyncPlan",
@@ -108,7 +104,7 @@ def detect_sync_hazards(
     global_real = _realpath_or_none(global_settings_path)
 
     for repo in repos:
-        settings_path = repo / _SETTINGS_RELPATH
+        settings_path = repo / settings_relpath(repo)
 
         # Dangling symlink — is_symlink but the target doesn't exist.
         if settings_path.is_symlink() and not settings_path.exists():
@@ -133,7 +129,7 @@ def detect_sync_hazards(
                         category="self-write-collision",
                         repo=repo,
                         message=(
-                            f"{repo.name}/.claude/settings.json resolves to the "
+                            f"{repo.name}/{settings_relpath(repo)} resolves to the "
                             "global settings source — writing it would mutate "
                             "the global allow list mid-loop"
                         ),
@@ -169,7 +165,7 @@ def _filter_self_writes(
     safe: list[Path] = []
     excluded: list[Path] = []
     for repo in repos:
-        settings_path = repo / _SETTINGS_RELPATH
+        settings_path = repo / settings_relpath(repo)
         if not settings_path.exists():
             safe.append(repo)
             continue
@@ -272,7 +268,7 @@ def run_sync(
                 global_allow=global_allow,
             )
 
-        settings_path = repo_path / _SETTINGS_RELPATH
+        settings_path = repo_path / settings_relpath(repo_path)
 
         # Case 1: settings.json does not exist
         if not settings_path.exists():
@@ -284,7 +280,7 @@ def run_sync(
                 )
             # Apply mode: write the file
             expected_dict = expected.to_settings_dict()
-            (repo_path / _CLAUDE_DIRNAME).mkdir(parents=True, exist_ok=True)
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
             settings_path.write_text(json.dumps(expected_dict, indent=2) + "\n", encoding="utf-8")
             return SyncResult(
                 repo_path=path_str,

@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+from init_permissions.layout import settings_relpath
 from init_permissions.models import GeneratedSettings
 from init_permissions.sync import (
     BulkSyncPlan,
@@ -45,7 +46,7 @@ def _write_settings(repo: Path, allow: list[str], ask: list[str], extra: dict | 
     }
     if extra:
         data.update(extra)
-    (repo / ".claude" / "settings.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+    (repo / settings_relpath(repo)).write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 # --- SyncAction enum ---
@@ -105,7 +106,7 @@ def test_run_sync_creates_when_missing(tmp_path: Path) -> None:
         result = run_sync(repo)
 
     assert result.action == SyncAction.CREATED
-    settings_path = repo / ".claude" / "settings.json"
+    settings_path = repo / settings_relpath(repo)
     assert settings_path.exists()
 
 
@@ -126,7 +127,7 @@ def test_run_sync_would_create_check_mode(tmp_path: Path) -> None:
         result = run_sync(repo, dry_run=True)
 
     assert result.action == SyncAction.WOULD_CREATE
-    settings_path = repo / ".claude" / "settings.json"
+    settings_path = repo / settings_relpath(repo)
     assert not settings_path.exists(), "dry_run=True must NOT write files"
 
 
@@ -187,7 +188,7 @@ def test_run_sync_would_update_check_mode(tmp_path: Path) -> None:
         },
         indent=2,
     )
-    (repo / ".claude" / "settings.json").write_text(original_content, encoding="utf-8")
+    (repo / settings_relpath(repo)).write_text(original_content, encoding="utf-8")
 
     expected = GeneratedSettings(allow=["entry-a"], ask=[])
 
@@ -199,7 +200,7 @@ def test_run_sync_would_update_check_mode(tmp_path: Path) -> None:
 
     assert result.action == SyncAction.WOULD_UPDATE
     # File must NOT be modified in check mode
-    actual_content = (repo / ".claude" / "settings.json").read_text(encoding="utf-8")
+    actual_content = (repo / settings_relpath(repo)).read_text(encoding="utf-8")
     assert actual_content == original_content
 
 
@@ -222,7 +223,7 @@ def test_run_sync_preserves_hooks(tmp_path: Path) -> None:
             ]
         },
     }
-    (repo / ".claude" / "settings.json").write_text(json.dumps(original_data, indent=2), encoding="utf-8")
+    (repo / settings_relpath(repo)).write_text(json.dumps(original_data, indent=2), encoding="utf-8")
 
     expected = GeneratedSettings(allow=["entry-a"], ask=[])
 
@@ -233,7 +234,7 @@ def test_run_sync_preserves_hooks(tmp_path: Path) -> None:
         result = run_sync(repo)
 
     assert result.action == SyncAction.UPDATED
-    written = json.loads((repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    written = json.loads((repo / settings_relpath(repo)).read_text(encoding="utf-8"))
     # hooks section must be preserved exactly
     assert "hooks" in written
     assert written["hooks"] == original_data["hooks"]
@@ -311,7 +312,7 @@ def test_detect_hazards_flags_self_write_collision(tmp_path: Path) -> None:
 
     repo = tmp_path / "github.com" / "me" / "dotfiles-like"
     (repo / ".claude").mkdir(parents=True)
-    symlink_target = repo / ".claude" / "settings.json"
+    symlink_target = repo / settings_relpath(repo)
     symlink_target.symlink_to(global_path)
 
     hazards = detect_sync_hazards([repo], global_settings_path=global_path)
@@ -330,7 +331,7 @@ def test_detect_hazards_flags_dangling_symlink(tmp_path: Path) -> None:
 
     repo = tmp_path / "git.example.com" / "team" / "broken"
     (repo / ".claude").mkdir(parents=True)
-    (repo / ".claude" / "settings.json").symlink_to(tmp_path / "does-not-exist.json")
+    (repo / settings_relpath(repo)).symlink_to(tmp_path / "does-not-exist.json")
 
     hazards = detect_sync_hazards([repo], global_settings_path=global_path)
 
@@ -364,7 +365,7 @@ def test_bulk_sync_excludes_self_write_repo(tmp_path: Path) -> None:
 
     dangerous_repo = tmp_path / "github.com" / "me" / "dotfiles"
     (dangerous_repo / ".claude").mkdir(parents=True)
-    (dangerous_repo / ".claude" / "settings.json").symlink_to(global_path)
+    (dangerous_repo / settings_relpath(dangerous_repo)).symlink_to(global_path)
 
     safe_result = SyncResult(repo_path=str(safe_repo), action=SyncAction.UNCHANGED, profile="work-app")
 

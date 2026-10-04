@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from init_permissions.checker import CheckResult, run_check
+from init_permissions.layout import settings_relpath
 from init_permissions.models import GeneratedSettings
 
 # --- Path scoping tests ---
@@ -41,17 +42,17 @@ def test_home_claude_path_skipped(tmp_path: Path) -> None:
 
 
 def test_missing_settings_returns_warning(tmp_path: Path) -> None:
-    """DET-01: Managed path missing .claude/settings.json produces warning with fix command."""
+    """DET-01: A work repo missing its personal settings layer gets a warning naming that file."""
     # A repo under the work prefix
     managed_repo = tmp_path / "git.example.com" / "team" / "test-repo"
     managed_repo.mkdir(parents=True)
-    # No .claude/settings.json created — this is the missing-settings case
+    # No .claude/settings.local.json created — this is the missing-settings case
 
     result = run_check(managed_repo)
     assert len(result.warnings) >= 1
     warning_text = " ".join(result.warnings)
     assert "MISSING" in warning_text
-    assert "settings.json" in warning_text
+    assert ".claude/settings.local.json" in warning_text
     assert "FIX:" in warning_text
     assert "CHECK:" in warning_text
 
@@ -87,7 +88,7 @@ def _write_settings(repo: Path, allow: list[str], ask: list[str]) -> None:
         "$schema": "https://json.schemastore.org/claude-code-settings.json",
         "permissions": {"allow": allow, "ask": ask},
     }
-    (repo / ".claude" / "settings.json").write_text(
+    (repo / settings_relpath(repo)).write_text(
         json.dumps(data, indent=2), encoding="utf-8"
     )
 

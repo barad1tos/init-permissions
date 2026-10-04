@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from init_permissions.checker import run_check
 from init_permissions.detector import detect_profile
-from init_permissions.layout import CONFIG_ENV_VAR, classify, load_layout
+from init_permissions.generator import write_settings
+from init_permissions.layout import CONFIG_ENV_VAR, classify, load_layout, settings_relpath
+from init_permissions.models import GeneratedSettings
+from init_permissions.sync import SyncAction, run_sync
 from init_permissions.validator import _discover_managed_repos
 
 
@@ -89,3 +93,38 @@ def test_discovery_spans_hosts_without_duplicates(tmp_path: Path, monkeypatch: p
     (tmp_path / "github.com" / "me" / "no-claude").mkdir()
 
     assert _discover_managed_repos() == sorted(expected)
+
+
+def test_work_repo_profile_goes_to_local_layer(git_layout: Path) -> None:
+    """Sync never touches a team-owned settings.json; the profile lands in settings.local.json."""
+    repo = git_layout / "git.example.com" / "team" / "service"
+    (repo / ".claude").mkdir(parents=True)
+    team_settings = repo / ".claude" / "settings.json"
+    team_bytes = json.dumps({"permissions": {"allow": [], "deny": ["Read(./.env)"]}}) + "\n"
+    team_settings.write_text(team_bytes, encoding="utf-8")
+
+    result = run_sync(repo, global_allow=set())
+
+    assert result.action == SyncAction.CREATED
+    assert team_settings.read_text(encoding="utf-8") == team_bytes
+    local = json.loads((repo / ".claude" / "settings.local.json").read_text(encoding="utf-8"))
+    assert "Bash(git push:*)" in local["permissions"]["ask"]
+    assert run_check(repo).warnings == []
+
+
+def test_write_settings_keeps_other_local_keys(git_layout: Path) -> None:
+    """Personal MCP settings in settings.local.json survive a regenerate."""
+    repo = git_layout / "git.example.com" / "team" / "workspace"
+    (repo / ".claude").mkdir(parents=True)
+    local = repo / ".claude" / "settings.local.json"
+    local.write_text(json.dumps({"enabledMcpjsonServers": ["jira"]}), encoding="utf-8")
+
+    write_settings(GeneratedSettings(allow=["Bash(make:*)"], ask=["Bash(git push:*)"]), repo)
+
+    written = json.loads(local.read_text(encoding="utf-8"))
+    assert written["enabledMcpjsonServers"] == ["jira"]
+    assert written["permissions"]["ask"] == ["Bash(git push:*)"]
+
+
+def test_own_repo_keeps_shared_settings(git_layout: Path) -> None:
+    assert settings_relpath(git_layout / "github.com" / "me" / "tool") == Path(".claude/settings.json")

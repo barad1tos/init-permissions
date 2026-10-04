@@ -197,6 +197,11 @@ anything else         →  not managed: check / validate / sync skip it
 
 The longest matching prefix wins, so `github.com/acme` above is work even though `github.com` is own.
 A prefix listed under both families counts as work. Without a config file nothing is managed.
+
+Work repos usually carry a team-owned `.claude/settings.json` with its own deny list, so the tool
+never writes it there: the work profile goes into `.claude/settings.local.json`, the personal layer
+Claude Code merges on top of the shared file. Own repos keep using `.claude/settings.json`. Either
+way only `$schema` and `permissions` are replaced; other top-level keys stay.
 `perms generate` still works on any path and falls back to `own`.
 
 Override at generation time: `perms generate --profile=work-infra .`
