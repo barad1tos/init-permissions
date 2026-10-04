@@ -198,7 +198,7 @@ def check(path: str) -> None:
     "validate_all",
     is_flag=True,
     default=False,
-    help="Validate all managed repos under Developer/Work/ and Developer/Own/.",
+    help="Validate all managed repos under the own/work prefixes from config.toml.",
 )
 def validate(path: str, *, validate_all: bool) -> None:
     """Validate permissions against the expected profile.

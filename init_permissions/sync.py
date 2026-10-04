@@ -31,13 +31,13 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from init_permissions.checker import MANAGED_PATH_SEGMENTS
 from init_permissions.generator import (
     _GLOBAL_SETTINGS_PATH,
     generate_settings,
     load_global_allow,
     resolve_profile,
 )
+from init_permissions.layout import is_managed
 from init_permissions.validator import _discover_managed_repos
 
 _CLAUDE_DIRNAME = ".claude"
@@ -256,7 +256,7 @@ def run_sync(
     path_str = str(repo_path)
 
     # Guard: skip non-managed paths
-    if not any(segment in path_str for segment in MANAGED_PATH_SEGMENTS):
+    if not is_managed(repo_path):
         return SyncResult(repo_path=path_str, action=SyncAction.SKIPPED, profile="")
 
     try:
@@ -362,10 +362,10 @@ class BulkSyncPlan:
 
 
 def bulk_sync(*, dry_run: bool = False) -> BulkSyncPlan:
-    """Sync settings.json for all managed repos under Developer/Work/ and Developer/Own/.
+    """Sync settings.json for all managed repos under the own/work prefixes from config.toml.
 
-    Discovers repos by scanning for directories containing .claude/ under the two
-    managed root paths, then:
+    Discovers repos by scanning for directories containing .claude/ under each
+    managed prefix, then:
 
     1. Snapshots the global allow list ONCE up front and reuses it for every
        per-repo generate_settings() call (prevents mid-loop drift when a

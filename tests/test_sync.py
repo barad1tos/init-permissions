@@ -30,9 +30,9 @@ from init_permissions.sync import (
 # --- Helpers ---
 
 
-def _make_managed_repo(tmp_path: Path, segment: str = "Work") -> Path:
+def _make_managed_repo(tmp_path: Path) -> Path:
     """Create a minimal managed-path repo with .claude/ directory."""
-    repo = tmp_path / "Developer" / segment / "test-repo"
+    repo = tmp_path / "git.example.com" / "team" / "test-repo"
     repo.mkdir(parents=True)
     (repo / ".claude").mkdir()
     return repo
@@ -81,7 +81,7 @@ def test_sync_result_model() -> None:
 
 
 def test_run_sync_skipped_non_managed(tmp_path: Path) -> None:
-    """run_sync on a non-managed path (not under Developer/Work or Developer/Own) returns SKIPPED."""
+    """run_sync on a non-managed path (outside every own/work prefix) returns SKIPPED."""
     result = run_sync(tmp_path)
 
     assert isinstance(result, SyncResult)
@@ -254,8 +254,8 @@ def _write_global_settings(path: Path, allow: list[str]) -> None:
 
 def test_bulk_sync_calls_run_sync_for_each_repo(tmp_path: Path) -> None:
     """bulk_sync calls run_sync for each discovered repo and returns BulkSyncPlan."""
-    repo1 = tmp_path / "Developer" / "Work" / "repo1"
-    repo2 = tmp_path / "Developer" / "Own" / "repo2"
+    repo1 = tmp_path / "git.example.com" / "team" / "repo1"
+    repo2 = tmp_path / "github.com" / "me" / "repo2"
     for repo in (repo1, repo2):
         repo.mkdir(parents=True)
         (repo / ".claude").mkdir()
@@ -283,7 +283,7 @@ def test_bulk_sync_calls_run_sync_for_each_repo(tmp_path: Path) -> None:
 
 def test_bulk_sync_passes_check_flag(tmp_path: Path) -> None:
     """bulk_sync passes dry_run=True to each run_sync call."""
-    repo = tmp_path / "Developer" / "Work" / "repo1"
+    repo = tmp_path / "git.example.com" / "team" / "repo1"
     repo.mkdir(parents=True)
     (repo / ".claude").mkdir()
 
@@ -309,7 +309,7 @@ def test_detect_hazards_flags_self_write_collision(tmp_path: Path) -> None:
     global_path = tmp_path / "home" / ".claude" / "settings.json"
     _write_global_settings(global_path, ["keep"])
 
-    repo = tmp_path / "Developer" / "Own" / "dotfiles-like"
+    repo = tmp_path / "github.com" / "me" / "dotfiles-like"
     (repo / ".claude").mkdir(parents=True)
     symlink_target = repo / ".claude" / "settings.json"
     symlink_target.symlink_to(global_path)
@@ -328,7 +328,7 @@ def test_detect_hazards_flags_dangling_symlink(tmp_path: Path) -> None:
     global_path = tmp_path / "home" / ".claude" / "settings.json"
     _write_global_settings(global_path, ["keep"])
 
-    repo = tmp_path / "Developer" / "Work" / "broken"
+    repo = tmp_path / "git.example.com" / "team" / "broken"
     (repo / ".claude").mkdir(parents=True)
     (repo / ".claude" / "settings.json").symlink_to(tmp_path / "does-not-exist.json")
 
@@ -343,7 +343,7 @@ def test_detect_hazards_clean_plan(tmp_path: Path) -> None:
     global_path = tmp_path / "home" / ".claude" / "settings.json"
     _write_global_settings(global_path, ["keep"])
 
-    repo = tmp_path / "Developer" / "Own" / "regular"
+    repo = tmp_path / "github.com" / "me" / "regular"
     (repo / ".claude").mkdir(parents=True)
     _write_settings(repo, allow=["entry-a"], ask=[])
 
@@ -358,11 +358,11 @@ def test_bulk_sync_excludes_self_write_repo(tmp_path: Path) -> None:
     global_path = tmp_path / "home" / ".claude" / "settings.json"
     _write_global_settings(global_path, ["keep"])
 
-    safe_repo = tmp_path / "Developer" / "Work" / "safe"
+    safe_repo = tmp_path / "git.example.com" / "team" / "safe"
     (safe_repo / ".claude").mkdir(parents=True)
     _write_settings(safe_repo, allow=["entry-a"], ask=[])
 
-    dangerous_repo = tmp_path / "Developer" / "Own" / "dotfiles"
+    dangerous_repo = tmp_path / "github.com" / "me" / "dotfiles"
     (dangerous_repo / ".claude").mkdir(parents=True)
     (dangerous_repo / ".claude" / "settings.json").symlink_to(global_path)
 
@@ -390,8 +390,8 @@ def test_bulk_sync_snapshots_global_allow_once(tmp_path: Path) -> None:
     This prevents the 2026-04-07 cascade bug: if dotfiles writes the global
     file mid-loop, subsequent repos must still see the original snapshot.
     """
-    repo1 = tmp_path / "Developer" / "Work" / "a"
-    repo2 = tmp_path / "Developer" / "Own" / "b"
+    repo1 = tmp_path / "git.example.com" / "team" / "a"
+    repo2 = tmp_path / "github.com" / "me" / "b"
     for r in (repo1, repo2):
         (r / ".claude").mkdir(parents=True)
 

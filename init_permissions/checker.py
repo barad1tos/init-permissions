@@ -17,8 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from init_permissions.generator import generate_settings, resolve_profile
-
-MANAGED_PATH_SEGMENTS = ("/Developer/Work/", "/Developer/Own/")
+from init_permissions.layout import is_managed
 
 
 class CheckResult(BaseModel):
@@ -33,7 +32,7 @@ def run_check(repo_path: Path) -> CheckResult:
     """Check permission health for a repository path.
 
     Returns a CheckResult with an empty warnings list for:
-    - Non-managed paths (paths not under Developer/Work/ or Developer/Own/)
+    - Non-managed paths (outside the own/work prefixes in config.toml)
     - Clean repos whose settings.json matches the expected profile
 
     Returns a CheckResult with warnings for:
@@ -49,7 +48,7 @@ def run_check(repo_path: Path) -> CheckResult:
     path_str = str(repo_path)
 
     # Guard clause: skip non-managed paths (D-04)
-    if not any(segment in path_str for segment in MANAGED_PATH_SEGMENTS):
+    if not is_managed(repo_path):
         return CheckResult(repo_path=path_str)
 
     settings_path = repo_path / ".claude" / "settings.json"

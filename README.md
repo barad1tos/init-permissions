@@ -36,7 +36,7 @@ perms sync                # same as perms-sync
 Session start
      │
      ▼
-permissions-check.sh          ← SessionStart hook (~/.claude/hooks/)
+permissions-check.sh          ← SessionStart hook in ~/.claude/hooks/
      │  reads cwd from hook input JSON
      │  skips non-managed paths silently
      │  checks ~/.claude/settings.json exists
@@ -104,7 +104,7 @@ to `~/.claude/settings.json` later, run `perms-sync` to remove the now-redundant
 
 ### `work-infra` — Terraform / AWS / Kubernetes repos
 
-Detected when: `Developer/Work/` path + `*.tf` files found within 3 directory levels.
+Detected when: a work prefix in `config.toml` + `*.tf` files found within 3 directory levels.
 
 **ask[] (requires confirmation — 11 entries):**
 
@@ -133,7 +133,7 @@ Detected when: `Developer/Work/` path + `*.tf` files found within 3 directory le
 
 ### `work-app` — Application repos (JS / Go / Python / Kotlin / Rust)
 
-Detected when: `Developer/Work/` path + no `*.tf` files.
+Detected when: a work prefix in `config.toml` + no `*.tf` files.
 
 **ask[] (requires confirmation — 3 entries):**
 
@@ -164,7 +164,7 @@ Multiple stacks can be detected simultaneously (e.g., a monorepo with both `pack
 
 ### `own` — Personal repos
 
-Detected when the path contains `Developer/Own/` (no content check needed).
+Detected when the repo sits under an own prefix in `config.toml` (no content check needed).
 
 **ask[] — empty.** Git push and everything else are auto-approved.
 
@@ -175,15 +175,29 @@ Detected when the path contains `Developer/Own/` (no content check needed).
 
 ## Profile Detection
 
-Detection is path-first:
+Detection is path-first. Checkouts are expected under one root as `<git_root>/<host>/<owner>/<repo>`,
+and `~/.config/init-permissions/config.toml` (or the file named by `$INIT_PERMISSIONS_CONFIG`) says
+which `host[/owner]` prefixes are own and which are work:
+
+```toml
+git_root = "~/git"
+
+[profiles]
+own = ["github.com"]
+work = ["git.example.com", "github.com/acme"]
+```
 
 ```
-path contains Developer/Own/  →  own  (no content check)
-path contains Developer/Work/ →  inspect for *.tf files
+under an own prefix   →  own  (no content check)
+under a work prefix   →  inspect for *.tf files
     found *.tf within 3 levels  →  work-infra
     no *.tf                     →  work-app
-any other path                  →  own  (fallback)
+anything else         →  not managed: check / validate / sync skip it
 ```
+
+The longest matching prefix wins, so `github.com/acme` above is work even though `github.com` is own.
+A prefix listed under both families counts as work. Without a config file nothing is managed.
+`perms generate` still works on any path and falls back to `own`.
 
 Override at generation time: `perms generate --profile=work-infra .`
 
@@ -208,7 +222,7 @@ This file is read at every `generate`, `check`, `validate`, and `sync` run — n
 
 ### Persistent profile override: `profile`
 
-The optional `profile` field (`"work-infra"` | `"work-app"` | `"own"`) overrides path-based detection across **every** subcommand. Use it when path detection picks the wrong profile for a repo — e.g. a `Developer/Work/` repo that contains `modules/*.tf` but should be treated as `work-app`, not `work-infra`. Without this field, `perms sync` would silently rewrite the file back to the path-detected profile on every run.
+The optional `profile` field (`"work-infra"` | `"work-app"` | `"own"`) overrides path-based detection across **every** subcommand. Use it when path detection picks the wrong profile for a repo — e.g. a work repo that contains `modules/*.tf` but should be treated as `work-app`, not `work-infra`. Without this field, `perms sync` would silently rewrite the file back to the path-detected profile on every run.
 
 When an override is set, `validator` skips its profile-mismatch check entirely — the override IS the user's declared truth, not drift.
 
@@ -222,7 +236,8 @@ When an override is set, `validator` skips its profile-mismatch check entirely �
 ### What it does
 
 1. Reads `cwd` from the hook input JSON
-2. Exits silently for non-managed paths (`/tmp`, `~/.claude`, etc.)
+2. Exits silently outside `git_root` (`/tmp`, `~/.claude`, etc.); inside it, the Python checker
+   decides whether the repo is under a managed prefix
 3. **Missing check** (always): if `.claude/settings.json` doesn't exist → warn immediately
 4. **Drift check** (weekly): compares current settings against generator output
 5. On any issue: wraps the checker output in `[PERMISSIONS — ACTION REQUIRED]` and outputs
@@ -321,7 +336,7 @@ Returns a verdict for each repo:
 | **FAIL** | Missing settings, ask[] drift, or profile mismatch |
 
 **Profile mismatch** (`VALID-03`): when `ask[]` signature in the actual file matches a
-_different_ profile than path detection suggests. Example: a `Developer/Work/` repo with
+_different_ profile than path detection suggests. Example: a work repo with
 empty `ask[]` (looks like `own`) — reported as mismatch with both profiles named.
 
 Bulk mode (`--all`) shows:
@@ -439,4 +454,4 @@ When asking about this system, use these names:
 | **SyncAction**        | Enum: UNCHANGED / UPDATED / CREATED / SKIPPED / WOULD_UPDATE / WOULD_CREATE / ERROR    |
 | **Verdict**           | Enum: PASS / WARN / FAIL                                                               |
 | **cache**             | `~/.claude/cache/permissions-check.json` — weekly drift check timestamps per repo      |
-| **managed paths**     | `/Developer/Work/` and `/Developer/Own/` — the only paths the tool acts on             |
+| **managed paths**     | Repos under the own/work prefixes of `config.toml` — the only paths the tool acts on   |
