@@ -64,8 +64,7 @@ class Layout(BaseModel):
 
 def config_path() -> Path:
     """Location of config.toml: $INIT_PERMISSIONS_CONFIG, else the XDG config dir."""
-    override = os.environ.get(CONFIG_ENV_VAR)
-    if override:
+    if override := os.environ.get(CONFIG_ENV_VAR):
         return Path(override).expanduser()
     config_home = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
     return Path(config_home) / "init-permissions" / "config.toml"

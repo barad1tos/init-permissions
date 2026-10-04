@@ -104,8 +104,11 @@ def run_check(repo_path: Path) -> CheckResult:
 
     # Append actionable fix commands for each type of drift found
     if warnings:
-        warnings.append("FIX: perms-diff  # preview changes  (or: perms sync --check)")
-        warnings.append(f"FIX: perms-gen  # regenerate this repo  (or: perms generate {repo_path})")
-        warnings.append(f"CHECK: perms-check  # verify after fix  (or: perms validate {repo_path})")
-
+        warnings.extend(
+            (
+                "FIX: perms-diff  # preview changes  (or: perms sync --check)",
+                f"FIX: perms-gen  # regenerate this repo  (or: perms generate {repo_path})",
+                f"CHECK: perms-check  # verify after fix  (or: perms validate {repo_path})",
+            )
+        )
     return CheckResult(repo_path=path_str, profile=profile_name, warnings=warnings)

@@ -130,8 +130,7 @@ def generate(path: str, profile: str | None, dry_run: bool, non_interactive: boo
 
     # Step 2: Detect stacks for work-app and show them
     if profile_name == "work-app":
-        stacks = detect_stacks(repo_path)
-        if stacks:
+        if stacks := detect_stacks(repo_path):
             click.echo(f"Detected stacks: {', '.join(stacks)}")
         else:
             click.echo("Detected stacks: none")
@@ -232,9 +231,9 @@ def _print_bulk_validation(results: list[ValidationResult]) -> None:
         console.print("No managed repos found.")
         return
 
-    pass_count = sum(1 for r in results if r.verdict == Verdict.PASS)
-    warn_count = sum(1 for r in results if r.verdict == Verdict.WARN)
-    fail_count = sum(1 for r in results if r.verdict == Verdict.FAIL)
+    pass_count = sum(r.verdict == Verdict.PASS for r in results)
+    warn_count = sum(r.verdict == Verdict.WARN for r in results)
+    fail_count = sum(r.verdict == Verdict.FAIL for r in results)
     total = len(results)
 
     summary = Text.assemble(
@@ -366,8 +365,8 @@ def _print_sync_hazards(hazards: list[Hazard]) -> None:
         return
 
     console = Console()
-    blocks = sum(1 for h in hazards if h.severity == "BLOCK")
-    warns = sum(1 for h in hazards if h.severity == "WARN")
+    blocks = sum(h.severity == "BLOCK" for h in hazards)
+    warns = sum(h.severity == "WARN" for h in hazards)
 
     parts: list[Text] = []
     for hazard in hazards:
@@ -527,10 +526,10 @@ def _print_sync_summary(results: list[SyncResult], *, dry_run: bool) -> None:
     """Print the final totals line for bulk sync."""
     from init_permissions.sync import SyncAction
 
-    updated = sum(1 for r in results if r.action in (SyncAction.UPDATED, SyncAction.WOULD_UPDATE))
-    created = sum(1 for r in results if r.action in (SyncAction.CREATED, SyncAction.WOULD_CREATE))
-    unchanged = sum(1 for r in results if r.action == SyncAction.UNCHANGED)
-    errors = sum(1 for r in results if r.action == SyncAction.ERROR)
+    updated = sum(r.action in (SyncAction.UPDATED, SyncAction.WOULD_UPDATE) for r in results)
+    created = sum(r.action in (SyncAction.CREATED, SyncAction.WOULD_CREATE) for r in results)
+    unchanged = sum(r.action == SyncAction.UNCHANGED for r in results)
+    errors = sum(r.action == SyncAction.ERROR for r in results)
 
     mode_label = "Would sync" if dry_run else "Synced"
     summary = Text.assemble(
