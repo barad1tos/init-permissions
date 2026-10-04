@@ -10,6 +10,8 @@ Note: GLOBAL is reachable only via `init-permissions global ...` — never retur
 by detect_profile(). It manages ~/.claude/settings.json itself.
 """
 
+from pathlib import Path
+
 from init_permissions.models import PermissionProfile, StackToolset
 
 # Command groups shared by several profiles
@@ -17,13 +19,17 @@ MAKE = "Bash(make:*)"
 DOCKER_READ = ["Bash(docker ps:*)", "Bash(docker images:*)", "Bash(docker logs:*)"]
 DOCKER_WRITE = ["Bash(docker build:*)", "Bash(docker push:*)"]
 GIT_PUSH = "Bash(git push:*)"
+# npx runs arbitrary registry packages, so only per-project profiles grant it
+NPX = "Bash(npx:*)"
+# Claude Code reads //<absolute path>; built at runtime so no username is baked in
+GLOBAL_CONFIG_READ = f"Read(/{Path.home()}/.claude/**)"
 
 # Stack detection: maps stack identifier to file markers and allowed commands.
 # Used by Work-App profile to add only relevant build tools per detected stack.
 STACK_TOOLS: dict[str, StackToolset] = {
     "node": StackToolset(
         markers=["package.json"],
-        allow=["Bash(npm:*)", "Bash(npx:*)", "Bash(yarn:*)", "Bash(pnpm:*)"],
+        allow=["Bash(npm:*)", NPX, "Bash(yarn:*)", "Bash(pnpm:*)"],
     ),
     "python": StackToolset(
         markers=["pyproject.toml", "setup.py", "requirements.txt"],
@@ -118,27 +124,28 @@ OWN = PermissionProfile(
 
 # GLOBAL profile: manages ~/.claude/settings.json itself.
 # Reachable only via `init-permissions global ...` — never returned by detect_profile().
-# The allow list mirrors the current contents of ~/.claude/settings.json plus the
-# new Read(~/.claude/**) entry that lets Claude inspect the global config.
+# The allow list mirrors ~/.claude/settings.json as the dotfiles repo ships it; global sync
+# rewrites that file from here, so an entry missing below is an entry sync would remove.
 GLOBAL = PermissionProfile(
     name="global",
     allow=[
         # Bash build/test/run tools
-        *ALL_STACK_ALLOW,
+        *(entry for entry in ALL_STACK_ALLOW if entry != NPX),
         MAKE,
         *DOCKER_READ,
         *DOCKER_WRITE,
         # Skills
-        "Skill(gsd:debug)",
-        "Skill(gsd:quick)",
+        "Skill(claude-skill-auditor)",
         "Skill(lessons-learned)",
         # WebFetch domains
+        "WebFetch(domain:apilist.tronscan.org)",
         "WebFetch(domain:gallery.ecr.aws)",
         "WebFetch(domain:pfisterer.dev)",
         "WebFetch(domain:repost.aws)",
+        "WebFetch(domain:tronscan.org)",
         "WebFetch(domain:www.solutiontoolkit.com)",
-        # NEW: lets Claude read the global ~/.claude config tree
-        "Read(~/.claude/**)",
+        # Lets Claude read the global ~/.claude config tree
+        GLOBAL_CONFIG_READ,
     ],
     ask=[],
 )

@@ -17,7 +17,7 @@ from init_permissions.global_sync import (
     run_global_sync,
     run_global_validate,
 )
-from init_permissions.profiles import GLOBAL
+from init_permissions.profiles import GLOBAL, GLOBAL_CONFIG_READ
 from init_permissions.sync import SyncAction
 from init_permissions.validator import Verdict
 
@@ -33,7 +33,7 @@ def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-_BASELINE_ALLOW = [e for e in GLOBAL.allow if e != "Read(~/.claude/**)"]
+_BASELINE_ALLOW = [e for e in GLOBAL.allow if e != GLOBAL_CONFIG_READ]
 
 
 # --- run_global_sync --------------------------------------------------------
@@ -119,7 +119,7 @@ def test_global_sync_merges_existing_baseline(global_path: Path) -> None:
     allow = data["permissions"]["allow"]
     for entry in _BASELINE_ALLOW:
         assert entry in allow
-    assert "Read(~/.claude/**)" in allow
+    assert GLOBAL_CONFIG_READ in allow
 
 
 def test_global_sync_atomic_write(global_path: Path) -> None:
