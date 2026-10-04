@@ -1,0 +1,37 @@
+[project]
+name = "init-permissions"
+version = "1.3.0"
+description = "Generate per-project .claude/settings.json from risk-based permission profiles"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.1",
+    "pydantic>=2.0",
+    "jsonschema>=4.0",
+    "rich>=13.7",
+]
+
+[project.scripts]
+init-permissions = "init_permissions.cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=6.0",
+    "ruff>=0.11",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 150
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "C4", "SIM", "B"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+venvPath = "."
+venv = ".venv"
