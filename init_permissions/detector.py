@@ -1,8 +1,8 @@
 """Auto-detection logic for permission profile assignment.
 
 Detection order (per D-08):
-1. Path-first: Developer/Own/ -> always 'own'
-2. Path-second: Developer/Work/ -> inspect contents for Infra vs. App
+1. Path-first: an own prefix from config.toml -> always 'own'
+2. Path-second: a work prefix -> inspect contents for Infra vs. App
 3. Fallback: any other path -> 'own'
 
 Work-Infra detection (per D-09/D-11):
@@ -12,15 +12,15 @@ Work-Infra detection (per D-09/D-11):
 
 from pathlib import Path
 
+from init_permissions.layout import classify
 from init_permissions.profiles import STACK_TOOLS
 
 
 def detect_profile(repo_path: Path) -> str:
     """Detect the permission profile for a repository.
 
-    Uses path-first detection: Developer/Own/ always maps to 'own'.
-    Developer/Work/ paths are inspected for *.tf files to distinguish
-    Work-Infra from Work-App.
+    Uses path-first detection: own prefixes from config.toml always map to 'own'.
+    Work prefixes are inspected for *.tf files to distinguish Work-Infra from Work-App.
 
     Args:
         repo_path: Path to the repository root directory.
@@ -28,17 +28,12 @@ def detect_profile(repo_path: Path) -> str:
     Returns:
         Profile name: 'work-infra', 'work-app', or 'own'.
     """
-    path_str = str(repo_path.resolve())
-
-    if "/Developer/Own/" in path_str:
-        return "own"
-
-    if "/Developer/Work/" in path_str:
+    if classify(repo_path) == "work":
         if _has_terraform_files(repo_path):
             return "work-infra"
         return "work-app"
 
-    # Fallback for paths outside known Developer/ structure
+    # Own prefixes and paths outside the configured layout
     return "own"
 
 

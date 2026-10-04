@@ -29,9 +29,9 @@ from init_permissions.validator import (
 # --- Helpers ---
 
 
-def _make_managed_repo(tmp_path: Path, segment: str = "Work") -> Path:
+def _make_managed_repo(tmp_path: Path) -> Path:
     """Create a minimal managed-path repo with .claude/ directory."""
-    repo = tmp_path / "Developer" / segment / "test-repo"
+    repo = tmp_path / "git.example.com" / "team" / "test-repo"
     repo.mkdir(parents=True)
     (repo / ".claude").mkdir()
     return repo
@@ -60,7 +60,7 @@ def test_verdict_values() -> None:
 
 def test_non_managed_path_returns_pass(tmp_path: Path) -> None:
     """Non-managed path (e.g. /tmp/foo) must return PASS with empty profile."""
-    # tmp_path won't contain /Developer/Work/ or /Developer/Own/
+    # tmp_path is the layout root, not a repo under a managed prefix
     result = run_validate(tmp_path)
 
     assert isinstance(result, ValidationResult)
@@ -74,7 +74,7 @@ def test_non_managed_path_returns_pass(tmp_path: Path) -> None:
 
 def test_missing_settings_returns_fail(tmp_path: Path) -> None:
     """Managed repo without settings.json returns FAIL."""
-    repo = tmp_path / "Developer" / "Work" / "no-settings-repo"
+    repo = tmp_path / "git.example.com" / "team" / "no-settings-repo"
     repo.mkdir(parents=True)
     # No .claude/settings.json
 
@@ -250,8 +250,8 @@ def test_profile_mismatch_detected(tmp_path: Path) -> None:
 def test_bulk_validate_returns_all_repos(tmp_path: Path) -> None:
     """bulk_validate() returns a ValidationResult for each discovered managed repo."""
     # Create two fake managed repos
-    repo1 = tmp_path / "Developer" / "Work" / "repo1"
-    repo2 = tmp_path / "Developer" / "Own" / "repo2"
+    repo1 = tmp_path / "git.example.com" / "team" / "repo1"
+    repo2 = tmp_path / "github.com" / "me" / "repo2"
     for r in (repo1, repo2):
         r.mkdir(parents=True)
         (r / ".claude").mkdir()
@@ -287,8 +287,8 @@ def test_bulk_validate_returns_all_repos(tmp_path: Path) -> None:
 
 def test_bulk_validate_handles_mixed_results(tmp_path: Path) -> None:
     """bulk_validate() returns correct per-repo verdicts for mixed clean/drifted repos."""
-    repo1 = tmp_path / "Developer" / "Work" / "clean-repo"
-    repo2 = tmp_path / "Developer" / "Work" / "drifted-repo"
+    repo1 = tmp_path / "git.example.com" / "team" / "clean-repo"
+    repo2 = tmp_path / "git.example.com" / "team" / "drifted-repo"
     for r in (repo1, repo2):
         r.mkdir(parents=True)
         (r / ".claude").mkdir()
@@ -339,7 +339,7 @@ def test_profile_override_suppresses_mismatch_and_passes(tmp_path: Path) -> None
     from init_permissions.models import RepoConfig
 
     repo = _make_managed_repo(tmp_path)
-    # Path-detected profile would be work-infra (Developer/Work + assume tf nearby),
+    # Path-detected profile would be work-infra (work prefix + assume tf nearby),
     # but the repo-config.json forces work-app.
     _write_settings(repo, allow=["entry-a"], ask=["ask-a"])
     expected = GeneratedSettings(allow=["entry-a"], ask=["ask-a"])

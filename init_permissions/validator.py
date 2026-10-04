@@ -18,13 +18,11 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from init_permissions.checker import MANAGED_PATH_SEGMENTS, run_check
+from init_permissions.checker import run_check
 from init_permissions.detector import detect_profile
 from init_permissions.generator import generate_settings, resolve_profile
+from init_permissions.layout import is_managed, load_layout
 from init_permissions.profiles import PROFILES
-
-# Managed Developer root directories for repo discovery.
-_MANAGED_ROOTS = ("Developer/Work", "Developer/Own")
 
 _CLAUDE_DIR = ".claude"
 
@@ -149,7 +147,7 @@ def run_validate(repo_path: Path) -> ValidationResult:
     path_str = str(repo_path)
 
     # Guard: non-managed paths get an immediate PASS — nothing to validate
-    if not any(segment in path_str for segment in MANAGED_PATH_SEGMENTS):
+    if not is_managed(repo_path):
         return ValidationResult(
             repo_path=path_str,
             profile="",
@@ -207,8 +205,8 @@ def run_validate(repo_path: Path) -> ValidationResult:
 def _scan_directory_for_repos(directory: Path) -> list[Path]:
     """Scan a directory up to two levels deep for repos containing .claude/.
 
-    Level 1: direct children (e.g., Developer/Own/dotfiles/).
-    Level 2: grandchildren (e.g., Developer/Work/team/service/).
+    Level 1: direct children (e.g., github.com/me/ -> dotfiles/).
+    Level 2: grandchildren (e.g., github.com/ -> me/dotfiles/).
     """
     repos: list[Path] = []
     for child in directory.iterdir():
@@ -224,25 +222,26 @@ def _scan_directory_for_repos(directory: Path) -> list[Path]:
 
 
 def _discover_managed_repos() -> list[Path]:
-    """Discover all managed repos under Developer/Work/ and Developer/Own/.
+    """Discover all managed repos under the own/work prefixes from config.toml.
 
     Returns:
-        Sorted list of repo root Paths.
+        Sorted list of repo root Paths; empty when no config exists.
     """
-    home = Path.home()
-    repos: list[Path] = []
-    for root_rel in _MANAGED_ROOTS:
-        root = home / root_rel
-        if root.exists():
-            repos.extend(_scan_directory_for_repos(root))
+    layout = load_layout()
+    if layout is None:
+        return []
+    repos: set[Path] = set()
+    for root in layout.managed_roots():
+        if root.is_dir():
+            repos.update(_scan_directory_for_repos(root))
     return sorted(repos)
 
 
 def bulk_validate() -> list[ValidationResult]:
-    """Validate all managed repos under Developer/Work/ and Developer/Own/.
+    """Validate all managed repos under the own/work prefixes from config.toml.
 
     Discovers repos by scanning for directories containing .claude/ under
-    the two managed root paths. Calls run_validate() for each discovered repo.
+    each managed prefix. Calls run_validate() for each discovered repo.
 
     Returns:
         List of ValidationResult sorted by repo_path.

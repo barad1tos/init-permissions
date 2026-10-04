@@ -21,9 +21,8 @@ from init_permissions.models import GeneratedSettings
 # --- Path scoping tests ---
 
 
-def test_non_developer_path_skipped(tmp_path: Path) -> None:
-    """Non-Developer paths (e.g. /tmp/foo) must be skipped — no warnings returned."""
-    # tmp_path is something like /private/var/folders/... — not a Developer path
+def test_layout_root_skipped(tmp_path: Path) -> None:
+    """The layout root itself is not a repo under a managed prefix — no warnings returned."""
     result = run_check(tmp_path)
     assert isinstance(result, CheckResult)
     assert result.warnings == []
@@ -31,7 +30,7 @@ def test_non_developer_path_skipped(tmp_path: Path) -> None:
 
 def test_home_claude_path_skipped(tmp_path: Path) -> None:
     """~/.claude path (global workspace) must be skipped — not a managed repo."""
-    # Simulate a path that doesn't contain /Developer/Work/ or /Developer/Own/
+    # Inside git_root but under no own/work prefix
     non_managed = tmp_path / "home" / ".claude"
     non_managed.mkdir(parents=True)
     result = run_check(non_managed)
@@ -43,8 +42,8 @@ def test_home_claude_path_skipped(tmp_path: Path) -> None:
 
 def test_missing_settings_returns_warning(tmp_path: Path) -> None:
     """DET-01: Managed path missing .claude/settings.json produces warning with fix command."""
-    # Create a managed path by embedding /Developer/Work/ in the structure
-    managed_repo = tmp_path / "Developer" / "Work" / "test-repo"
+    # A repo under the work prefix
+    managed_repo = tmp_path / "git.example.com" / "team" / "test-repo"
     managed_repo.mkdir(parents=True)
     # No .claude/settings.json created — this is the missing-settings case
 
@@ -59,7 +58,7 @@ def test_missing_settings_returns_warning(tmp_path: Path) -> None:
 
 def test_new_managed_repo_prompts_setup(tmp_path: Path) -> None:
     """DET-02: Managed path without .claude/ directory at all still triggers setup warning."""
-    managed_repo = tmp_path / "Developer" / "Own" / "new-repo"
+    managed_repo = tmp_path / "github.com" / "me" / "new-repo"
     managed_repo.mkdir(parents=True)
     # No .claude/ directory at all — completely new repo
 
@@ -73,9 +72,9 @@ def test_new_managed_repo_prompts_setup(tmp_path: Path) -> None:
 # --- DET-03: Drift detection ---
 
 
-def _make_managed_repo(tmp_path: Path, profile_segment: str = "Work") -> Path:
+def _make_managed_repo(tmp_path: Path) -> Path:
     """Helper: create a managed repo directory with .claude/ sub-directory."""
-    repo = tmp_path / "Developer" / profile_segment / "drift-test-repo"
+    repo = tmp_path / "git.example.com" / "team" / "drift-test-repo"
     repo.mkdir(parents=True)
     claude_dir = repo / ".claude"
     claude_dir.mkdir()
