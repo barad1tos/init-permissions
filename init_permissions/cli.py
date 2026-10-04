@@ -27,10 +27,12 @@ from rich.text import Text
 from init_permissions.detector import detect_stacks
 from init_permissions.generator import (
     generate_settings,
+    merge_settings,
     resolve_profile,
     write_settings,
 )
-from init_permissions.models import RepoConfig
+from init_permissions.layout import settings_relpath
+from init_permissions.models import GeneratedSettings, RepoConfig
 from init_permissions.validator import ValidationResult, Verdict
 
 if TYPE_CHECKING:
@@ -42,20 +44,21 @@ def cli() -> None:
     """Permission management for per-project .claude/settings.json."""
 
 
-def _show_settings_diff(repo_path: Path, settings_dict: dict[str, object]) -> None:
-    """Display a unified diff between existing and proposed settings.json."""
-    existing_path = repo_path / ".claude" / "settings.json"
+def _show_settings_diff(repo_path: Path, settings: GeneratedSettings) -> None:
+    """Display a unified diff between the existing and the proposed settings file."""
+    settings_relative = settings_relpath(repo_path)
+    existing_path = repo_path / settings_relative
     if not existing_path.exists():
         return
 
     existing_text = existing_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    new_text = (json.dumps(settings_dict, indent=2) + "\n").splitlines(keepends=True)
+    new_text = (json.dumps(merge_settings(existing_path, settings), indent=2) + "\n").splitlines(keepends=True)
     diff_lines = list(
         difflib.unified_diff(
             existing_text,
             new_text,
-            fromfile=".claude/settings.json (current)",
-            tofile=".claude/settings.json (proposed)",
+            fromfile=f"{settings_relative} (current)",
+            tofile=f"{settings_relative} (proposed)",
         )
     )
     if not diff_lines:
@@ -153,7 +156,7 @@ def generate(path: str, profile: str | None, dry_run: bool, non_interactive: boo
         click.echo(click.style(f"  ? {entry}", fg="yellow"))
 
     # Step 6: Show unified diff against existing settings.json if present
-    _show_settings_diff(repo_path, settings_dict)
+    _show_settings_diff(repo_path, settings)
 
     # Step 7: Confirm and write
     if dry_run:
@@ -161,7 +164,7 @@ def generate(path: str, profile: str | None, dry_run: bool, non_interactive: boo
         return
 
     if not non_interactive:
-        click.confirm("\nWrite .claude/settings.json?", abort=True)
+        click.confirm(f"\nWrite {settings_relpath(repo_path)}?", abort=True)
 
     written_path = write_settings(settings, repo_path)
     click.echo(f"Written to {written_path}")

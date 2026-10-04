@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from init_permissions.checker import run_check
 from init_permissions.detector import detect_profile
 from init_permissions.generator import generate_settings, resolve_profile
-from init_permissions.layout import is_managed, load_layout
+from init_permissions.layout import is_managed, load_layout, settings_relpath
 from init_permissions.profiles import PROFILES
 
 _CLAUDE_DIR = ".claude"
@@ -166,7 +166,7 @@ def run_validate(repo_path: Path) -> ValidationResult:
 
     # Profile mismatch detection (VALID-03) — skipped when an explicit override is set,
     # because the override IS the user's declared truth, nothing to mismatch against.
-    settings_path = repo_path / _CLAUDE_DIR / "settings.json"
+    settings_path = repo_path / settings_relpath(repo_path)
     if has_override:
         applied_profile, profile_mismatch, mismatch_issues = effective, False, []
     else:

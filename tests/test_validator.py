@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+from init_permissions.layout import settings_relpath
 from init_permissions.models import GeneratedSettings
 from init_permissions.validator import (
     ValidationResult,
@@ -42,7 +43,7 @@ def _write_settings(repo: Path, allow: list[str], ask: list[str]) -> None:
         "$schema": "https://json.schemastore.org/claude-code-settings.json",
         "permissions": {"allow": allow, "ask": ask},
     }
-    (repo / ".claude" / "settings.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+    (repo / settings_relpath(repo)).write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 # --- Verdict enum ---

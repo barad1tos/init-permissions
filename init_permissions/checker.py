@@ -17,7 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from init_permissions.generator import generate_settings, resolve_profile
-from init_permissions.layout import is_managed
+from init_permissions.layout import is_managed, settings_relpath
 
 
 class CheckResult(BaseModel):
@@ -51,7 +51,8 @@ def run_check(repo_path: Path) -> CheckResult:
     if not is_managed(repo_path):
         return CheckResult(repo_path=path_str)
 
-    settings_path = repo_path / ".claude" / "settings.json"
+    settings_relative = settings_relpath(repo_path)
+    settings_path = repo_path / settings_relative
 
     # Resolve effective profile once (honors .claude/repo-config.json `profile` override)
     profile_name, repo_config = resolve_profile(repo_path)
@@ -63,7 +64,7 @@ def run_check(repo_path: Path) -> CheckResult:
             repo_path=path_str,
             profile=profile_name,
             warnings=[
-                f"MISSING: No .claude/settings.json for {repo_path.name} (detected profile: {profile_name})",
+                f"MISSING: No {settings_relative} for {repo_path.name} (detected profile: {profile_name})",
                 f"FIX: perms-gen  # or: perms generate {repo_path}",
                 f"CHECK: perms-check  # or: perms validate {repo_path}",
             ],
