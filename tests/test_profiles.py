@@ -7,6 +7,8 @@ These tests enforce D-13, D-18, D-19, D-22 at the data layer:
 - All three profiles are retrievable by name
 """
 
+from pathlib import Path
+
 import pytest
 
 from init_permissions.profiles import OWN, PROFILES, WORK_APP, WORK_INFRA, get_profile
@@ -29,16 +31,16 @@ _GLOBAL_BASELINE_ALLOW = [
     "Bash(gradle:*)",
     "Bash(make:*)",
     "Bash(npm:*)",
-    "Bash(npx:*)",
     "Bash(pnpm:*)",
     "Bash(pytest:*)",
     "Bash(yarn:*)",
-    "Skill(gsd:debug)",
-    "Skill(gsd:quick)",
+    "Skill(claude-skill-auditor)",
     "Skill(lessons-learned)",
+    "WebFetch(domain:apilist.tronscan.org)",
     "WebFetch(domain:gallery.ecr.aws)",
     "WebFetch(domain:pfisterer.dev)",
     "WebFetch(domain:repost.aws)",
+    "WebFetch(domain:tronscan.org)",
     "WebFetch(domain:www.solutiontoolkit.com)",
 ]
 
@@ -138,10 +140,11 @@ def test_global_profile_exists() -> None:
 
 
 def test_global_has_read_claude_dir_entry() -> None:
-    """GLOBAL allow includes the new Read(~/.claude/**) entry."""
-    from init_permissions.profiles import GLOBAL
+    """GLOBAL allow grants reading the global config tree by absolute //path, without a baked-in user."""
+    from init_permissions.profiles import GLOBAL, GLOBAL_CONFIG_READ
 
-    assert "Read(~/.claude/**)" in GLOBAL.allow
+    assert f"Read(/{Path.home()}/.claude/**)" == GLOBAL_CONFIG_READ
+    assert GLOBAL_CONFIG_READ in GLOBAL.allow
 
 
 def test_global_ask_is_empty() -> None:
@@ -152,11 +155,20 @@ def test_global_ask_is_empty() -> None:
 
 
 def test_global_baseline_preserved() -> None:
-    """All 28 baseline entries from current ~/.claude/settings.json are present in GLOBAL."""
+    """Every baseline entry from the shipped ~/.claude/settings.json is present in GLOBAL."""
     from init_permissions.profiles import GLOBAL
 
     for entry in _GLOBAL_BASELINE_ALLOW:
         assert entry in GLOBAL.allow, f"Baseline entry missing from GLOBAL: {entry}"
+
+
+def test_npx_is_granted_per_project_only() -> None:
+    """npx stays out of the global layer; own repos and node work repos still get it."""
+    from init_permissions.profiles import GLOBAL, NPX, STACK_TOOLS
+
+    assert NPX not in GLOBAL.allow
+    assert NPX in OWN.allow
+    assert NPX in STACK_TOOLS["node"].allow
 
 
 def test_global_not_in_repo_config_literal() -> None:
