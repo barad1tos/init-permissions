@@ -177,20 +177,16 @@ def run_validate(repo_path: Path) -> ValidationResult:
 
     # Extra allow[] entries: WARN if no other failures
     if settings_path.exists() and verdict == Verdict.PASS:
-        try:
+        with contextlib.suppress(json.JSONDecodeError, OSError):
             actual_data = json.loads(settings_path.read_text(encoding="utf-8"))
             actual_allow = set(actual_data.get("permissions", {}).get("allow", []))
             stderr_buf = io.StringIO()
             with contextlib.redirect_stderr(stderr_buf):
                 expected = generate_settings(effective, repo_path, repo_config)
             expected_allow = set(expected.allow)
-            extra_allow = actual_allow - expected_allow
-            if extra_allow:
+            if extra_allow := actual_allow - expected_allow:
                 issues.append(f"allow[] has {len(extra_allow)} extra entries beyond profile (customization, harmless): {sorted(extra_allow)}")
                 verdict = Verdict.WARN
-        except (json.JSONDecodeError, OSError):
-            pass
-
     return ValidationResult(
         repo_path=path_str,
         profile=effective,
@@ -215,9 +211,7 @@ def _scan_directory_for_repos(directory: Path) -> list[Path]:
         if (child / _CLAUDE_DIR).is_dir():
             repos.append(child)
             continue
-        for grandchild in child.iterdir():
-            if grandchild.is_dir() and (grandchild / _CLAUDE_DIR).is_dir():
-                repos.append(grandchild)
+        repos.extend(grandchild for grandchild in child.iterdir() if grandchild.is_dir() and (grandchild / _CLAUDE_DIR).is_dir())
     return repos
 
 
